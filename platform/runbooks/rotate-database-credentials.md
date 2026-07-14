@@ -7,48 +7,54 @@ tags: [payments, postgres]
 timestamp: 2026-07-01T09:30:00Z
 ---
 
+# How rotation works here
+
+The ESC environment `acme/prod/payments-db` uses the `fn::rotate::postgres`
+rotator with two database users (`app_user_a` and `app_user_b`). The rotator
+owns the pair: at any time one user's credentials are exposed as `current`
+and the other's as `previous`. A rotation resets the `previous` user's
+password and promotes it to `current`; the old `current` becomes `previous`
+and **stays valid**. The [Payments Worker](/services/payments-worker.md)
+always reads `current` at startup, which is what makes rotation
+zero-downtime.
+
 # When to run
 
 * On the regular 90-day rotation schedule.
 * Immediately, if the credentials may have been exposed.
 
-Rotation is zero-downtime because the database has two application users
-(`app_user_a` and `app_user_b`) and only one is active at a time. Rotating
-means resetting the password of the inactive user, switching the
-[Payments Worker](/services/payments-worker.md) over to it, and then
-resetting the old one.
-
 # Steps
 
-1. Identify the inactive user: check the `payments-db/active_user` value in
-   the Pulumi ESC environment `acme/prod/payments-db`.
-1. Rotate the inactive user's password in ESC:
+1. Rotate the environment:
 
    ```console
    pulumi env rotate acme/prod/payments-db
    ```
 
-   The environment's rotator resets the inactive user's password in RDS and
-   writes the new secret; nothing consuming the active user is touched.
-1. Flip `active_user` to the freshly rotated user in the same environment.
-1. Roll the worker so it picks up the new credentials at startup:
+   The rotator resets the `previous` user's password in RDS and swaps it to
+   `current`. Nothing running is affected: pods hold the old credentials,
+   which are now `previous` and still valid.
+1. Roll the worker so new pods start with the new `current` credentials:
 
    ```console
-   pulumi up --stack prod
+   kubectl -n payments rollout restart deployment/payments-worker
    ```
 
-   in the `payments` project. The deployment rolls pods gradually; old pods
-   keep working on the still-valid old credentials until they terminate.
+   The rollout is gradual; old pods keep working on the still-valid
+   `previous` credentials until they terminate.
 1. Verify: queue depth returns to baseline and the worker's database
    connection errors stay at zero for 15 minutes.
-1. Rotate the now-inactive user's password the same way, so no credential
-   issued before this window remains valid.
+1. Do **not** rotate again until every consumer has restarted. A second
+   rotation would reset the credentials the old pods are still using —
+   never rotate more often than your workloads refresh their configuration.
 
 # If something goes wrong
 
-Flip `active_user` back and run `pulumi up` again — the previous credentials
-remain valid until step 6, which is what makes the rollback safe.
+The old credentials remain valid as `previous` until the *next* rotation,
+so the rollback is to stop the rollout, fix the worker, and roll again —
+no password needs to be restored.
 
 # Citations
 
-[1] [Pulumi ESC secret rotation documentation](https://www.pulumi.com/docs/esc/operations/rotation/)
+[1] [Pulumi ESC postgres rotator](https://www.pulumi.com/docs/esc/providers/rotators/postgres/)
+[2] [Database user setup for rotation](https://www.pulumi.com/docs/esc/operations/rotation/db-user-setup/)

@@ -2,7 +2,7 @@
 
 An [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) (OKF v0.1) knowledge bundle for a Pulumi platform team: the runbooks, decision records, and service pages that infrastructure as code never captures, in a format any coding agent can traverse.
 
-Companion repo to the Pulumi blog post [Knowledge as Code: The Memory File Just Got a Standard](https://www.pulumi.com/blog/knowledge-as-code-the-memory-file-just-got-a-standard/).
+Companion repo to the Pulumi blog post [Knowledge as Code: The Memory File Just Got a Spec](https://www.pulumi.com/blog/knowledge-as-code-the-memory-file-just-got-a-spec/).
 
 ## What's inside
 

@@ -27,8 +27,10 @@ the only workload with write access to that database.
 
 # Database credentials
 
-Credentials are injected from a Pulumi ESC environment at deploy time; the
-worker never stores them. Rotation is a routine, zero-downtime procedure —
+Credentials come from the Pulumi ESC environment `acme/prod/payments-db`,
+which manages a two-user rotation pair; the worker reads the environment's
+`current` credentials at startup and never stores them. Rotation is a
+routine, zero-downtime procedure —
 see [Rotate the payments database credentials](/runbooks/rotate-database-credentials.md).
 
 # Dependencies
